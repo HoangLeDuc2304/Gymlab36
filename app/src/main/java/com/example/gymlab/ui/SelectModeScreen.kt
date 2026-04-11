@@ -23,6 +23,10 @@ fun SelectModeScreen(
     onBackClick: () -> Unit,
     onSelectMode: (Boolean) -> Unit // true for AI, false for Normal
 ) {
+    // Hỗ trợ AI cho cả Lunge và Plank
+    val isAiSupported = exerciseName.lowercase().contains("lunge") || 
+                        exerciseName.lowercase().contains("plank")
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -63,9 +67,12 @@ fun SelectModeScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             ModeButton(
-                title = "CHẾ ĐỘ AI (BETA)",
-                description = "Sử dụng Camera để AI đếm số lần tập (Sắp ra mắt)",
-                color = Color(0xFF00C853),
+                title = if (isAiSupported) "CHẾ ĐỘ AI" else "CHẾ ĐỘ AI (SẮP RA MẮT)",
+                description = if (isAiSupported) 
+                    "Sử dụng Camera để AI kiểm tra tư thế và đếm giờ/số lần" 
+                    else "Hiện tại chỉ hỗ trợ bài tập Lunges và Plank. Các bài tập khác đang được cập nhật.",
+                color = if (isAiSupported) Color(0xFF00C853) else Color.LightGray,
+                enabled = isAiSupported,
                 onClick = { onSelectMode(true) }
             )
         }
@@ -77,19 +84,34 @@ fun ModeButton(
     title: String,
     description: String,
     color: Color,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
             .height(100.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = color)
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color,
+            disabledContainerColor = Color(0xFFE0E0E0)
+        )
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(text = description, fontSize = 12.sp, textAlign = TextAlign.Center)
+            Text(
+                text = title, 
+                fontWeight = FontWeight.Bold, 
+                fontSize = 18.sp,
+                color = if (enabled) Color.White else Color.Gray
+            )
+            Text(
+                text = description, 
+                fontSize = 12.sp, 
+                textAlign = TextAlign.Center,
+                color = if (enabled) Color.White.copy(alpha = 0.8f) else Color.Gray
+            )
         }
     }
 }

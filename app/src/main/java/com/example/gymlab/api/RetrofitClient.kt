@@ -4,9 +4,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    // 10.0.2.2 trỏ đến localhost của máy tính từ Emulator
-    // Nếu dùng máy thật, hãy đổi thành IP của máy tính (ví dụ: 192.168.1.x)
-    private const val BASE_URL = "http://10.0.2.2:3000/"
+    // Đã đổi sang cổng 3001
+    private const val BASE_URL = "http://192.168.100.175:3001/"
 
     val instance: AuthApi by lazy {
         val retrofit = Retrofit.Builder()

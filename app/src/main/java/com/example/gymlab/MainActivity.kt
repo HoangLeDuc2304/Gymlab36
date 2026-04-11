@@ -77,9 +77,8 @@ fun GymlabApp() {
                 RegisterScreen(
                     onBackClick = { navController.popBackStack() },
                     onRegisterSuccess = { user ->
-                        // SỬA TẠI ĐÂY: Thay vì vào thẳng Home, quay về Login
-                        navController.navigate("login") {
-                            popUpTo("register") { inclusive = true }
+                        navController.navigate("home/${user.userId}/${user.username}") {
+                            popUpTo("login") { inclusive = true }
                         }
                     }
                 )
@@ -127,7 +126,10 @@ fun GymlabApp() {
             }
 
             // 5. TRANG TIẾN ĐỘ (PROGRESS)
-            composable(route = "progress/{userId}") { backStackEntry ->
+            composable(
+                route = "progress/{userId}",
+                arguments = listOf(navArgument("userId") { type = NavType.IntType })
+            ) { backStackEntry ->
                 val userId = backStackEntry.arguments?.getInt("userId") ?: 0
                 ProgressScreen(
                     userId = userId,
@@ -212,6 +214,7 @@ fun GymlabApp() {
                 WorkoutTimerScreen(
                     detailId = detailId,
                     exerciseName = exerciseName,
+                    mode = mode,
                     onFinish = { id, duration ->
                         navController.navigate("finish_workout/$userId/$id/$duration/$mode") {
                             popUpTo("workout_schedule/$userId") { inclusive = false }
@@ -222,21 +225,20 @@ fun GymlabApp() {
 
             // 10. KẾT THÚC BÀI TẬP (FINISH SCREEN)
             composable(
-                route = "finish_workout/{userId}/{detailId}/{duration}/{mode}",
+                route = "finish_workout/{userId}/{id}/{duration}/{mode}",
                 arguments = listOf(
                     navArgument("userId") { type = NavType.IntType },
-                    navArgument("detailId") { type = NavType.IntType },
+                    navArgument("id") { type = NavType.IntType },
                     navArgument("duration") { type = NavType.IntType },
                     navArgument("mode") { type = NavType.StringType }
                 )
             ) { backStackEntry ->
                 val userId = backStackEntry.arguments?.getInt("userId") ?: 0
-                val detailId = backStackEntry.arguments?.getInt("detailId") ?: 0
+                val id = backStackEntry.arguments?.getInt("id") ?: 0
                 val duration = backStackEntry.arguments?.getInt("duration") ?: 0
                 val mode = backStackEntry.arguments?.getString("mode") ?: "normal"
-
                 FinishScreen(
-                    detailId = detailId,
+                    detailId = id,
                     duration = duration,
                     mode = mode,
                     onContinueClick = {
@@ -245,7 +247,22 @@ fun GymlabApp() {
                 )
             }
 
-            // 11. THÊM BÀI TẬP (ADD WORKOUT)
+            // 11. CÀI ĐẶT TÀI KHOẢN (ACCOUNT SETTINGS)
+            composable(
+                route = "account_settings/{userName}",
+                arguments = listOf(navArgument("userName") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val userName = backStackEntry.arguments?.getString("userName") ?: ""
+                AccountSettingsScreen(
+                    userName = userName,
+                    onBackClick = { navController.popBackStack() },
+                    onChangeNameClick = { /* Điều hướng đến màn hình đổi tên nếu có */ },
+                    onChangePasswordClick = { /* Điều hướng đến màn hình đổi mật khẩu nếu có */ },
+                    onDeleteAccountClick = { /* Xử lý xóa tài khoản */ }
+                )
+            }
+
+            // 12. THÊM BÀI TẬP (ADD WORKOUT)
             composable(
                 route = "add_workout/{userId}/{date}",
                 arguments = listOf(
@@ -268,34 +285,14 @@ fun GymlabApp() {
             composable("diet") { DietScreen(onBackClick = { navController.popBackStack() }) }
             composable("activity") { ActivityScreen(onBackClick = { navController.popBackStack() }) }
             composable("create_template") { CreateTemplateScreen(onBackClick = { navController.popBackStack() }, onSuccess = { navController.popBackStack() }) }
-            
-            // QUÊN MẬT KHẨU
             composable("forgot_password") { 
                 ForgotPasswordScreen(
                     onBackClick = { navController.popBackStack() }, 
-                    onCodeSentSuccess = { email ->
-                        navController.navigate("reset_password/$email")
+                    onCodeSentSuccess = { email -> 
+                        // Điều hướng sang màn hình nhập OTP nếu có
                     }, 
                     onLoginNowClick = { navController.navigate("login") }
                 ) 
-            }
-            
-            // ĐẶT LẠI MẬT KHẨU MỚI
-            composable(
-                route = "reset_password/{email}",
-                arguments = listOf(navArgument("email") { type = NavType.StringType })
-            ) { backStackEntry ->
-                val email = backStackEntry.arguments?.getString("email") ?: ""
-                ResetPasswordScreen(
-                    email = email,
-                    onBackClick = { navController.popBackStack() },
-                    onResetSuccess = {
-                        // Quay về màn hình đăng nhập và xóa stack cũ
-                        navController.navigate("login") {
-                            popUpTo("login") { inclusive = true }
-                        }
-                    }
-                )
             }
         }
     }
