@@ -68,7 +68,6 @@ fun ProgressScreen(
             BottomNavigationBar(
                 onProfileClick = {},
                 onActivityClick = onActivityClick,
-                onDietClick = onDietClick,
                 onScheduleClick = onScheduleClick
             )
         }

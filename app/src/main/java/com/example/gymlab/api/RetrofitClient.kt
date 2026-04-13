@@ -5,7 +5,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
     // Đã đổi sang cổng 3001
-    private const val BASE_URL = "http://192.168.100.175:3001/"
+    private const val BASE_URL = "http://10.0.2.2:3001/"
 
     val instance: AuthApi by lazy {
         val retrofit = Retrofit.Builder()

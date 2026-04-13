@@ -66,7 +66,6 @@ fun AchievementsScreen(
             BottomNavigationBar(
                 onProfileClick = {},
                 onActivityClick = onActivityClick,
-                onDietClick = onDietClick,
                 onScheduleClick = onScheduleClick
             )
         }

@@ -1,5 +1,6 @@
 package com.example.gymlab.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -11,25 +12,38 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.gymlab.api.RetrofitClient
+import com.example.gymlab.api.UpdateNameRequest
 import com.example.gymlab.ui.theme.PrimaryPurple
+import kotlinx.coroutines.launch
 
 @Composable
 fun AccountSettingsScreen(
+    userId: Int,
     userName: String,
     onBackClick: () -> Unit,
-    onChangeNameClick: () -> Unit,
+    onNameUpdated: (String) -> Unit,
     onChangePasswordClick: () -> Unit,
     onDeleteAccountClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    var showNameDialog by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf(userName) }
+    var currentName by remember { mutableStateOf(userName) }
+    var isUpdating by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -80,8 +94,11 @@ fun AccountSettingsScreen(
                     iconContainerColor = Color(0xFFE7F0FF),
                     iconTintColor = Color(0xFF4081FF),
                     title = "Đổi tên hiển thị",
-                    subtitle = "Tên hiển thị hiện tại: $userName",
-                    onClick = onChangeNameClick
+                    subtitle = "Tên hiện tại: $currentName",
+                    onClick = { 
+                        newName = currentName
+                        showNameDialog = true 
+                    }
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -118,6 +135,79 @@ fun AccountSettingsScreen(
                 onClick = onDeleteAccountClick
             )
         }
+    }
+
+    // Dialog đổi tên
+    if (showNameDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isUpdating) showNameDialog = false },
+            title = { Text("Đổi tên hiển thị", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Nhập tên mới của bạn:", fontSize = 14.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newName.isNotBlank() && newName != currentName) {
+                            isUpdating = true
+                            scope.launch {
+                                try {
+                                    val response = RetrofitClient.instance.updateName(
+                                        UpdateNameRequest(userId, newName)
+                                    )
+                                    if (response.isSuccessful && response.body()?.success == true) {
+                                        currentName = newName
+                                        onNameUpdated(newName)
+                                        Toast.makeText(context, "Đã đổi tên thành công!", Toast.LENGTH_SHORT).show()
+                                        showNameDialog = false
+                                    } else {
+                                        Toast.makeText(context, "Lỗi server!", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Lỗi kết nối!", Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    isUpdating = false
+                                }
+                            }
+                        } else if (newName == currentName) {
+                            showNameDialog = false
+                        }
+                    },
+                    enabled = !isUpdating && newName.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
+                ) {
+                    if (isUpdating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Cập nhật")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showNameDialog = false }, 
+                    enabled = !isUpdating
+                ) {
+                    Text("Hủy", color = Color.Gray)
+                }
+            },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 }
 

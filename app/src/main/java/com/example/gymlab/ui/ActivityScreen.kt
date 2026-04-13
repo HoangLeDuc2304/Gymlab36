@@ -38,15 +38,13 @@ import kotlin.math.abs
 
 @Composable
 fun ActivityScreen(
+    userId: Int, // Thêm tham số userId thực tế
     onBackClick: () -> Unit
 ) {
     var newWeightInput by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val historyList = remember { mutableStateListOf<WeightRecordApi>() }
     var isLoading by remember { mutableStateOf(false) }
-
-    // Giả định userId = 1
-    val userId = 1
 
     // Tự động cập nhật cân nặng hiển thị ở ô tím từ bản ghi đầu tiên trong lịch sử
     val currentWeightDisplay by remember {
@@ -72,7 +70,7 @@ fun ActivityScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(userId) { // Tải lại khi userId thay đổi
         loadWeightHistory()
     }
 
@@ -231,7 +229,7 @@ fun ActivityScreen(
             historyList.forEachIndexed { index, record ->
                 val previousWeight = if (index < historyList.size - 1) historyList[index + 1].weight else record.weight
                 val diff = record.weight - previousWeight
-                
+
                 HistoryItem(
                     date = record.recordedDate?.take(10) ?: "N/A",
                     weight = "${record.weight} kg",
@@ -241,7 +239,7 @@ fun ActivityScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
         }
-        
+
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
@@ -292,7 +290,7 @@ fun WeightChart(data: List<WeightRecordApi>) {
     Canvas(modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 24.dp, top = 24.dp, bottom = 40.dp)) {
         val width = size.width
         val height = size.height
-        
+
         val paddingLeft = 40.dp.toPx()
         val paddingBottom = 20.dp.toPx()
         val chartWidth = width - paddingLeft
@@ -308,7 +306,7 @@ fun WeightChart(data: List<WeightRecordApi>) {
         for (i in 0..steps) {
             val y = chartHeight - (i.toFloat() / steps) * chartHeight
             val label = String.format("%.1f", minWeight + (i.toFloat() / steps) * range)
-            
+
             drawLine(
                 color = Color(0xFFEEEEEE),
                 start = Offset(paddingLeft, y),
@@ -343,7 +341,7 @@ fun WeightChart(data: List<WeightRecordApi>) {
                 lineTo(points.first().x, chartHeight)
                 close()
             }
-            
+
             drawPath(
                 path = fillPath,
                 brush = Brush.verticalGradient(
@@ -361,15 +359,21 @@ fun WeightChart(data: List<WeightRecordApi>) {
         points.forEachIndexed { index, offset ->
             drawCircle(PrimaryPurple, radius = 4.dp.toPx(), center = offset)
             drawCircle(Color.White, radius = 2.dp.toPx(), center = offset)
-            
-            if (data.size < 7 || index % (data.size / 5 + 1) == 0) {
-                val dateLabel = data[index].recordedDate?.takeLast(5) ?: ""
-                drawText(
-                    textMeasurer = textMeasurer,
-                    text = dateLabel,
-                    style = textStyle,
-                    topLeft = Offset(offset.x - 10.dp.toPx(), chartHeight + 10.dp.toPx())
-                )
+
+            // Hiển thị nhãn ngày dưới trục X (định dạng MM-DD)
+            val fullDate = data[index].recordedDate ?: ""
+            if (fullDate.length >= 10) {
+                val dateLabel = fullDate.substring(5, 10).replace("-", "/")
+                
+                // Chỉ hiển thị nhãn nếu không quá dày đặc
+                if (data.size <= 7 || index % (data.size / 5 + 1) == 0 || index == data.size - 1) {
+                    drawText(
+                        textMeasurer = textMeasurer,
+                        text = dateLabel,
+                        style = textStyle,
+                        topLeft = Offset(offset.x - 12.dp.toPx(), chartHeight + 10.dp.toPx())
+                    )
+                }
             }
         }
     }

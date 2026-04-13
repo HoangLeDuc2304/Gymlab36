@@ -1,6 +1,7 @@
 package com.example.gymlab.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -16,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.gymlab.api.DietSuggestion
 import com.example.gymlab.api.RetrofitClient
 import com.example.gymlab.ui.theme.PrimaryPurple
@@ -26,71 +29,14 @@ import com.example.gymlab.ui.theme.TextGray
 import kotlinx.coroutines.launch
 
 @Composable
-fun DayTab(day: String, isSelected: Boolean, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.size(45.dp).clip(RoundedCornerShape(12.dp)),
-        color = if (isSelected) PrimaryPurple else Color(0xFFF5F5F5)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(text = day, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else Color.Gray)
-        }
-    }
-}
-
-@Composable
-fun DietMealCard(title: String, subtitle: String, onDelete: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFFFFF9C4)))
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                Text(text = subtitle, fontSize = 13.sp, color = Color.Gray)
-            }
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(36.dp).background(Color(0xFFFFEBEE), CircleShape)
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(20.dp))
-            }
-        }
-    }
-}
-
-@Composable
-fun MealSection(sectionTitle: String, meals: List<DietSuggestion>, onDeleteMeal: (Int) -> Unit) {
-    Column(modifier = Modifier.padding(vertical = 12.dp)) {
-        Text(text = sectionTitle, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-        Spacer(modifier = Modifier.height(12.dp))
-        if (meals.isEmpty()) {
-            Text(text = "Chưa có món ăn", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp))
-        } else {
-            meals.forEach { meal ->
-                val displayTitle = meal.title.substringAfter(": ").trim()
-                DietMealCard(
-                    title = displayTitle,
-                    subtitle = "${meal.calories} Kcal • 5 phút",
-                    onDelete = { meal.id?.let { onDeleteMeal(it) } }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun DietScreen(onBackClick: () -> Unit) {
+fun DietScreen(userId: Int, onBackClick: () -> Unit) {
     var selectedDay by remember { mutableStateOf("T3") }
     val days = listOf("T2", "T3", "T4", "T5", "T6", "T7")
-    
+
     var showDialog by remember { mutableStateOf(false) }
     var newMealTitle by remember { mutableStateOf("") }
     var newMealCalo by remember { mutableStateOf("") }
+    var newMealImageUrl by remember { mutableStateOf("") }
     var mealType by remember { mutableStateOf("Bữa Sáng") }
 
     val scope = rememberCoroutineScope()
@@ -160,9 +106,9 @@ fun DietScreen(onBackClick: () -> Unit) {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = PrimaryPurple) }
             } else {
-                MealSection("Bữa Sáng", meals.filter { it.title.contains("sáng", ignoreCase = true) }, onDeleteMeal = { deleteMeal(it) })
-                MealSection("Bữa Trưa", meals.filter { it.title.contains("trưa", ignoreCase = true) }, onDeleteMeal = { deleteMeal(it) })
-                MealSection("Bữa Phụ", meals.filter { it.title.contains("phụ", ignoreCase = true) }, onDeleteMeal = { deleteMeal(it) })
+                MealSection("Bữa Sáng", meals.filter { it.mealType == "Breakfast" }, onDeleteMeal = { deleteMeal(it) })
+                MealSection("Bữa Trưa", meals.filter { it.mealType == "Lunch" }, onDeleteMeal = { deleteMeal(it) })
+                MealSection("Bữa Phụ", meals.filter { it.mealType == "Snack" }, onDeleteMeal = { deleteMeal(it) })
             }
             Spacer(modifier = Modifier.height(80.dp))
         }
@@ -177,6 +123,8 @@ fun DietScreen(onBackClick: () -> Unit) {
                     OutlinedTextField(value = newMealTitle, onValueChange = { newMealTitle = it }, label = { Text("Tên món ăn") }, modifier = Modifier.fillMaxWidth())
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(value = newMealCalo, onValueChange = { newMealCalo = it }, label = { Text("Số Calo") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = newMealImageUrl, onValueChange = { newMealImageUrl = it }, label = { Text("Link hình ảnh món ăn") }, modifier = Modifier.fillMaxWidth())
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Loại bữa:", fontWeight = FontWeight.Bold)
                     Column {
@@ -190,12 +138,89 @@ fun DietScreen(onBackClick: () -> Unit) {
                 Button(onClick = {
                     if (newMealTitle.isNotBlank()) {
                         scope.launch {
-                            val response = RetrofitClient.instance.addDiet(DietSuggestion(title = "$mealType: $newMealTitle", calories = newMealCalo.toIntOrNull() ?: 0, mealType = selectedDay))
-                            if (response.isSuccessful) { loadDiet(selectedDay); showDialog = false; newMealTitle = ""; newMealCalo = "" }
+                            val dietRequest = DietSuggestion(
+                                title = newMealTitle,
+                                calories = newMealCalo.toIntOrNull() ?: 0,
+                                thumbnailUrl = if(newMealImageUrl.isBlank()) null else newMealImageUrl,
+                                mealType = if(mealType == "Bữa Sáng") "Breakfast" else if(mealType == "Bữa Trưa") "Lunch" else "Snack",
+                                dayOfWeek = selectedDay
+                            )
+                            val response = RetrofitClient.instance.addDiet(dietRequest)
+                            if (response.isSuccessful) {
+                                loadDiet(selectedDay)
+                                showDialog = false
+                                newMealTitle = ""
+                                newMealCalo = ""
+                                newMealImageUrl = ""
+                            }
                         }
                     }
                 }) { Text("Lưu") }
             }
         )
+    }
+}
+
+@Composable
+fun DayTab(day: String, isSelected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(if (isSelected) PrimaryPurple else Color.White).clickable { onClick() }.padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = day, color = if (isSelected) Color.White else TextGray, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun MealSection(title: String, meals: List<DietSuggestion>, onDeleteMeal: (Int) -> Unit) {
+    Column {
+        Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextGray)
+        Spacer(modifier = Modifier.height(12.dp))
+        if (meals.isEmpty()) {
+            Text(text = "Chưa có món ăn", fontSize = 14.sp, color = Color.LightGray)
+        } else {
+            meals.forEach { meal ->
+                MealItem(meal, onDeleteMeal)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+fun MealItem(meal: DietSuggestion, onDeleteMeal: (Int) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Ảnh món ăn (Dùng Coil để load)
+            AsyncImage(
+                model = meal.thumbnailUrl ?: "https://cdn-icons-png.flaticon.com/512/706/706164.png",
+                contentDescription = null,
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF0F0F0)),
+                contentScale = ContentScale.Crop
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = meal.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(text = "${meal.calories} Kcal", fontSize = 14.sp, color = TextGray)
+            }
+
+            IconButton(onClick = { meal.id?.let { onDeleteMeal(it) } }) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+            }
+        }
     }
 }

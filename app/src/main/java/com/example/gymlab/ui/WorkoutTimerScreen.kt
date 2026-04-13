@@ -62,7 +62,11 @@ fun WorkoutTimerScreen(
     val remainingSeconds = seconds % 60
     val timerText = String.format("%02d:%02d", minutes, remainingSeconds)
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
         if (mode == "ai") {
             val cameraPermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
             
@@ -154,76 +158,79 @@ fun WorkoutTimerScreen(
                     }
                 }
             }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(if (mode == "ai") Color.Transparent else Color.White)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Bottom
-        ) {
-            Surface(
-                color = Color.White.copy(alpha = 0.9f),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+        } else {
+            // Giao diện tập thường (Normal Mode) theo ảnh 2
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Text(
+                    text = exerciseName,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                // Timer Circle
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(240.dp)
+                        .clip(CircleShape)
+                        .background(PrimaryPurple.copy(alpha = 0.1f))
                 ) {
                     Text(
-                        text = exerciseName + if (mode == "ai") " (AI MODE)" else "",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
                         text = timerText,
-                        fontSize = 48.sp,
+                        fontSize = 64.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (mode == "ai" && !isPoseDetected) Color.Gray else PrimaryPurple
+                        color = PrimaryPurple
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(64.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Nút Pause/Play
+                    Surface(
+                        onClick = { isRunning = !isRunning },
+                        modifier = Modifier.size(64.dp),
+                        shape = CircleShape,
+                        color = Color(0xFFF5F5F5)
                     ) {
-                        FilledIconButton(
-                            onClick = { isRunning = !isRunning },
-                            modifier = Modifier.size(56.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = if (isRunning) Color(0xFFF5F5F5) else PrimaryPurple
-                            )
-                        ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isRunning) "Pause" else "Play",
-                                tint = if (isRunning) Color.Black else Color.White
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(32.dp)
                             )
                         }
+                    }
 
-                        Button(
-                            onClick = {
-                                isRunning = false
-                                onFinish(detailId, seconds.toInt())
-                            },
-                            modifier = Modifier
-                                .height(56.dp)
-                                .weight(1f)
-                                .padding(start = 16.dp),
-                            shape = RoundedCornerShape(28.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
-                        ) {
-                            Text("HOÀN THÀNH", fontWeight = FontWeight.Bold)
-                        }
+                    Spacer(modifier = Modifier.width(32.dp))
+
+                    // Nút Hoàn thành
+                    Button(
+                        onClick = {
+                            isRunning = false
+                            onFinish(detailId, seconds.toInt())
+                        },
+                        modifier = Modifier
+                            .height(64.dp)
+                            .weight(1f),
+                        shape = RoundedCornerShape(32.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
+                    ) {
+                        Text("HOÀN THÀNH", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }

@@ -30,7 +30,7 @@ data class RegisterRequest(
 
 data class LoginResponse(
     val success: Boolean,
-    val message: String,
+    val message: String? = null,
     val user: UserData? = null
 )
 
@@ -39,10 +39,11 @@ data class UserData(
     val username: String? = null,
     val email: String? = null,
     @SerializedName("full_name") val fullName: String? = null,
+    @SerializedName("profile_image") val profileImage: String? = null,
     val goal_note: String? = null
 )
 
-// ===== Quên mật khẩu =====
+// ===== Quên mật khẩu & Đổi mật khẩu =====
 data class SendOtpRequest(val email: String)
 data class ResetPasswordRequest(
     val email: String,
@@ -50,12 +51,31 @@ data class ResetPasswordRequest(
     @SerializedName("newPassword") val newPassword: String
 )
 
+data class ChangePasswordRequest(
+    val email: String,
+    val oldPassword: String,
+    val newPassword: String
+)
+
+data class UpdateNameRequest(
+    @SerializedName("user_id") val userId: Int,
+    val username: String
+)
+
+// ===== Avatar Update =====
+data class UpdateAvatarRequest(
+    @SerializedName("user_id") val userId: Int,
+    @SerializedName("profile_image") val profileImage: String
+)
+
 // ===== Diet =====
 data class DietSuggestion(
     @SerializedName("suggestion_id") val id: Int? = null,
     val title: String,
     val calories: Int,
-    @SerializedName("meal_type") val mealType: String
+    @SerializedName("thumbnail_url") val thumbnailUrl: String? = null,
+    @SerializedName("meal_type") val mealType: String,
+    @SerializedName("day_of_week") val dayOfWeek: String
 )
 
 data class DietListResponse(
@@ -232,6 +252,18 @@ interface AuthApi {
 
     @POST("reset-password")
     suspend fun resetPassword(@Body request: ResetPasswordRequest): Response<ApiResponse>
+
+    @POST("change-password")
+    suspend fun changePassword(@Body request: ChangePasswordRequest): Response<ApiResponse>
+
+    @POST("users/update-name")
+    suspend fun updateName(@Body request: UpdateNameRequest): Response<ApiResponse>
+
+    @GET("users/{userId}")
+    suspend fun getUserInfo(@Path("userId") userId: Int): Response<LoginResponse>
+
+    @POST("users/update-avatar")
+    suspend fun updateAvatar(@Body request: UpdateAvatarRequest): Response<ApiResponse>
 
     // ===== Diet =====
     @GET("diet/{day}")

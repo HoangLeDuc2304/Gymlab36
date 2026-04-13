@@ -6,7 +6,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -19,10 +18,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.gymlab.api.ResetPasswordRequest
+import com.example.gymlab.api.ChangePasswordRequest
 import com.example.gymlab.api.RetrofitClient
 import com.example.gymlab.ui.theme.PrimaryPurple
-import com.example.gymlab.ui.theme.TextGray
 import kotlinx.coroutines.launch
 
 @Composable
@@ -31,10 +29,11 @@ fun ResetPasswordScreen(
     onBackClick: () -> Unit,
     onResetSuccess: () -> Unit
 ) {
-    var otpCode by remember { mutableStateOf("") }
+    var oldPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     
+    var isOldPasswordVisible by remember { mutableStateOf(false) }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isConfirmPasswordVisible by remember { mutableStateOf(false) }
     
@@ -45,166 +44,96 @@ fun ResetPasswordScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.White)
             .padding(24.dp),
         horizontalAlignment = Alignment.Start
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        IconButton(
-            onClick = onBackClick,
-            modifier = Modifier
-                .size(40.dp)
-                .background(Color(0xFFF5F5F5), shape = CircleShape)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = Color.Black,
-                modifier = Modifier.size(20.dp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color(0xFFF5F5F5), shape = CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.Black,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "Đổi mật khẩu",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
             )
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "Tạo mật khẩu mới 🔑",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Mã xác nhận gồm 6 chữ số đã được gửi đến email $email. Hãy nhập mã đó và thiết lập mật khẩu mới.",
+            text = "Vui lòng nhập mật khẩu cũ và thiết lập mật khẩu mới cho tài khoản của bạn.",
             fontSize = 14.sp,
-            color = TextGray,
+            color = Color.Gray,
             lineHeight = 20.sp
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // OTP Field
+        // Mật khẩu hiện tại
         Text(
-            text = "Mã xác nhận (OTP)",
+            text = "Mật khẩu hiện tại",
             fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        OutlinedTextField(
-            value = otpCode,
-            onValueChange = { 
-                if (it.length <= 6) otpCode = it 
-                errorMessage = null
-            },
-            placeholder = { Text("Nhập 6 số...", color = Color.LightGray) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = Color.LightGray
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = Color(0xFFF8F9FA),
-                focusedContainerColor = Color(0xFFF8F9FA),
-                unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = PrimaryPurple,
-                cursorColor = PrimaryPurple
-            )
+        PasswordTextField(
+            value = oldPassword,
+            onValueChange = { oldPassword = it; errorMessage = null },
+            placeholder = "Nhập mật khẩu cũ",
+            isVisible = isOldPasswordVisible,
+            onToggleVisibility = { isOldPasswordVisible = !isOldPasswordVisible },
+            enabled = !isLoading
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // New Password Field
+        // Mật khẩu mới
         Text(
             text = "Mật khẩu mới",
             fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        OutlinedTextField(
+        PasswordTextField(
             value = newPassword,
-            onValueChange = { 
-                newPassword = it 
-                errorMessage = null
-            },
-            placeholder = { Text("Tối thiểu 8 ký tự", color = Color.LightGray) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = Color.LightGray
-                )
-            },
-            trailingIcon = {
-                IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                    Icon(
-                        imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        contentDescription = null,
-                        tint = Color.LightGray
-                    )
-                }
-            },
-            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = Color(0xFFF8F9FA),
-                focusedContainerColor = Color(0xFFF8F9FA),
-                unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = PrimaryPurple,
-                cursorColor = PrimaryPurple
-            )
+            onValueChange = { newPassword = it; errorMessage = null },
+            placeholder = "Tối thiểu 8 ký tự",
+            isVisible = isPasswordVisible,
+            onToggleVisibility = { isPasswordVisible = !isPasswordVisible },
+            enabled = !isLoading
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Confirm Password Field
+        // Nhập lại mật khẩu mới
         Text(
             text = "Nhập lại mật khẩu mới",
             fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        OutlinedTextField(
+        PasswordTextField(
             value = confirmPassword,
-            onValueChange = { 
-                confirmPassword = it 
-                errorMessage = null
-            },
-            placeholder = { Text("Nhập lại mật khẩu ở trên", color = Color.LightGray) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = Color.LightGray
-                )
-            },
-            trailingIcon = {
-                IconButton(onClick = { isConfirmPasswordVisible = !isConfirmPasswordVisible }) {
-                    Icon(
-                        imageVector = if (isConfirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        contentDescription = null,
-                        tint = Color.LightGray
-                    )
-                }
-            },
-            visualTransformation = if (isConfirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = Color(0xFFF8F9FA),
-                focusedContainerColor = Color(0xFFF8F9FA),
-                unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = PrimaryPurple,
-                cursorColor = PrimaryPurple
-            )
+            onValueChange = { confirmPassword = it; errorMessage = null },
+            placeholder = "Nhập lại mật khẩu mới ở trên",
+            isVisible = isConfirmPasswordVisible,
+            onToggleVisibility = { isConfirmPasswordVisible = !isConfirmPasswordVisible },
+            enabled = !isLoading
         )
 
         if (errorMessage != null) {
@@ -216,12 +145,12 @@ fun ResetPasswordScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
         Button(
             onClick = {
-                if (otpCode.length < 6) {
-                    errorMessage = "Vui lòng nhập đủ 6 số OTP"
+                if (oldPassword.isEmpty()) {
+                    errorMessage = "Vui lòng nhập mật khẩu hiện tại"
                     return@Button
                 }
                 if (newPassword.length < 8) {
@@ -236,13 +165,19 @@ fun ResetPasswordScreen(
                 isLoading = true
                 scope.launch {
                     try {
-                        val response = RetrofitClient.instance.resetPassword(
-                            ResetPasswordRequest(email, otpCode, newPassword)
+                        val response = RetrofitClient.instance.changePassword(
+                            ChangePasswordRequest(email, oldPassword, newPassword)
                         )
-                        if (response.isSuccessful && response.body()?.success == true) {
-                            onResetSuccess() // Quay về màn hình Login
+                        if (response.isSuccessful) {
+                            val body = response.body()
+                            if (body?.success == true) {
+                                onResetSuccess() 
+                            } else {
+                                errorMessage = body?.message ?: "Lỗi khi đổi mật khẩu"
+                            }
                         } else {
-                            errorMessage = response.body()?.message ?: "OTP không đúng hoặc đã hết hạn"
+                            // Xử lý khi mã lỗi HTTP không phải 2xx (ví dụ 400, 500)
+                            errorMessage = "Lỗi hệ thống: ${response.code()}"
                         }
                     } catch (e: Exception) {
                         errorMessage = "Lỗi kết nối server"
@@ -259,7 +194,11 @@ fun ResetPasswordScreen(
             colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
             } else {
                 Text(
                     text = "Cập nhật mật khẩu",
@@ -269,5 +208,42 @@ fun ResetPasswordScreen(
                 )
             }
         }
+        Spacer(modifier = Modifier.height(16.dp))
     }
+}
+
+@Composable
+fun PasswordTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    isVisible: Boolean,
+    onToggleVisibility: () -> Unit,
+    enabled: Boolean
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(placeholder, color = Color.LightGray) },
+        trailingIcon = {
+            IconButton(onClick = onToggleVisibility) {
+                Icon(
+                    imageVector = if (isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    contentDescription = null,
+                    tint = Color.LightGray
+                )
+            }
+        },
+        visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = Color.White,
+            focusedContainerColor = Color.White,
+            unfocusedBorderColor = Color.LightGray,
+            focusedBorderColor = PrimaryPurple,
+            cursorColor = PrimaryPurple
+        )
+    )
 }
