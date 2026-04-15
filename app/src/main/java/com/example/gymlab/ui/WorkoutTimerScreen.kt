@@ -2,11 +2,13 @@ package com.example.gymlab.ui
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
@@ -63,6 +65,8 @@ fun WorkoutTimerScreen(
     // AI Mode specific state
     var isPoseDetected by remember { mutableStateOf(false) }
     var reps by remember { mutableIntStateOf(0) }
+    var accuracy by remember { mutableIntStateOf(0) }
+    var feedback by remember { mutableStateOf("") }
     var currentPose by remember { mutableStateOf<Pose?>(null) }
     var imageWidth by remember { mutableIntStateOf(0) }
     var imageHeight by remember { mutableIntStateOf(0) }
@@ -109,33 +113,66 @@ fun WorkoutTimerScreen(
                                 currentPose = updatedPose
                                 imageWidth = width
                                 imageHeight = height
-                            }
+                            },
+                            onAccuracyUpdated = { score -> accuracy = score },
+                            onFeedbackUpdated = { text -> feedback = text }
                         )
                     }
                 )
                 
-                // Overlay AI feedback
+                // Overlay AI feedback, Accuracy & REAL-TIME FEEDBACK
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(if (isLandscape) 16.dp else 24.dp),
-                    contentAlignment = if (isLandscape) Alignment.TopEnd else Alignment.TopCenter
+                    contentAlignment = if (isLandscape) Alignment.Center else Alignment.TopCenter
                 ) {
-                    Surface(
-                        color = if (isPoseDetected) Color.Green.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = if (isPoseDetected) "ĐANG ĐẾM GIỜ..." else "CHƯA NHẬN DIỆN TƯ THẾ",
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = if (isLandscape) 14.sp else 16.sp
-                        )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            color = if (isPoseDetected) Color(0xFF00C853).copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (isPoseDetected) "ĐANG ĐẾM GIỜ..." else "CHƯA NHẬN DIỆN TƯ THẾ",
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (isLandscape) 14.sp else 16.sp
+                            )
+                        }
+                        
+                        if (isPoseDetected) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            AccuracyBadge(accuracy)
+                        }
+
+                        // HIỂN THỊ HƯỚNG DẪN SỬA TƯ THẾ
+                        if (feedback.isNotEmpty() && feedback != "Tư thế tốt!" && feedback != "Plank rất tốt!") {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                color = Color(0xFFFFD600).copy(alpha = 0.9f),
+                                shape = RoundedCornerShape(8.dp),
+                                shadowElevation = 4.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Info, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = feedback,
+                                        color = Color.Black,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 
-                // Tư thế mẫu - Chỉ hiện ảnh, bỏ khung và chữ "MẪU"
+                // Tư thế mẫu
                 Box(
                     modifier = Modifier.fillMaxSize().padding(16.dp),
                     contentAlignment = if (isLandscape) Alignment.TopStart else Alignment.TopEnd
@@ -150,13 +187,6 @@ fun WorkoutTimerScreen(
                                 .size(if (isLandscape) 100.dp else 120.dp)
                                 .clip(RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.PlayArrow, 
-                            contentDescription = null, 
-                            tint = Color.White.copy(alpha = 0.5f), 
-                            modifier = Modifier.size(if (isLandscape) 30.dp else 40.dp)
                         )
                     }
                 }
@@ -252,5 +282,30 @@ fun WorkoutTimerScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun AccuracyBadge(accuracy: Int) {
+    val targetColor = when {
+        accuracy > 80 -> Color(0xFF00C853)
+        accuracy > 50 -> Color(0xFFFFD600)
+        else -> Color(0xFFFF5252)
+    }
+    
+    val animatedColor by animateColorAsState(targetValue = targetColor, label = "color")
+    
+    Surface(
+        color = animatedColor,
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 4.dp
+    ) {
+        Text(
+            text = "$accuracy%",
+            color = if (accuracy > 50 && accuracy <= 80) Color.Black else Color.White,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
     }
 }

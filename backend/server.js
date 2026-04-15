@@ -440,6 +440,7 @@ app.post('/complete-exercise', (req, res) => {
             sed.is_completed,
             e.calories,
             e.duration_seconds,
+            e.category_id,
             ws.user_id,
             ws.date AS schedule_date,
             u.weight
@@ -517,67 +518,91 @@ app.post('/complete-exercise', (req, res) => {
                     });
                 }
 
-                const dailyProgressQuery = `
-                    SELECT
-                        COUNT(*) AS total_count,
-                        SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) AS completed_count
-                    FROM session_exercise_details
-                    WHERE schedule_id = ?
+                // Lấy các bài tập gợi ý cùng danh mục
+                const suggestionsQuery = `
+                    SELECT exercise_id as id, name, calories, difficulty_level as difficulty
+                    FROM exercises
+                    WHERE category_id = ? AND exercise_id != ?
+                    ORDER BY RAND()
+                    LIMIT 3
                 `;
 
-                db.execute(dailyProgressQuery, [row.schedule_id], (err3, progressRows) => {
-                    if (err3) return res.status(500).json({ success: false, message: err3.message });
+                db.execute(suggestionsQuery, [row.category_id, row.exercise_id], (errSug, suggestions) => {
+                    if (errSug) {
+                        console.error('Lỗi lấy gợi ý:', errSug.message);
+                    }
 
-                    const totalCount = Number(progressRows[0].total_count || 0);
-                    const completedCount = Number(progressRows[0].completed_count || 0);
-                    const reached50Percent = totalCount > 0 && (completedCount / totalCount) >= 0.5;
+                    const dailyProgressQuery = `
+                        SELECT
+                            COUNT(*) AS total_count,
+                            SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) AS completed_count
+                        FROM session_exercise_details
+                        WHERE schedule_id = ?
+                    `;
 
-                    db.execute('SELECT * FROM achievements WHERE user_id = ? LIMIT 1', [row.user_id], (err4, achRows) => {
-                        if (err4) return res.status(500).json({ success: false, message: err4.message });
+                    db.execute(dailyProgressQuery, [row.schedule_id], (err3, progressRows) => {
+                        if (err3) return res.status(500).json({ success: false, message: err3.message });
 
-                        let currentStreak = 0, longestStreak = 0, totalPoints = 0, totalExp = 0, totalTime = 0, lastWorkoutDate = null;
-                        if (achRows.length > 0) {
-                            const ach = achRows[0];
-                            currentStreak = ach.current_streak || 0;
-                            longestStreak = ach.longest_streak || 0;
-                            totalPoints = ach.total_points || 0;
-                            totalExp = ach.total_exp || 0;
-                            totalTime = ach.total_time || 0;
-                            lastWorkoutDate = ach.last_workout_date;
-                        }
+                        const totalCount = Number(progressRows[0].total_count || 0);
+                        const completedCount = Number(progressRows[0].completed_count || 0);
+                        const reached50Percent = totalCount > 0 && (completedCount / totalCount) >= 0.5;
 
-                        let newCurrentStreak = currentStreak;
-                        if (reached50Percent) {
-                            const today = new Date(row.schedule_date); today.setHours(0,0,0,0);
-                            if (lastWorkoutDate) {
-                                const lastDate = new Date(lastWorkoutDate); lastDate.setHours(0,0,0,0);
-                                const diffDays = Math.round((today - lastDate) / (1000 * 60 * 60 * 24));
-                                if (diffDays === 0) newCurrentStreak = currentStreak || 1;
-                                else if (diffDays === 1) newCurrentStreak = currentStreak + 1;
-                                else newCurrentStreak = 1;
-                            } else { newCurrentStreak = 1; }
-                        }
+                        db.execute('SELECT * FROM achievements WHERE user_id = ? LIMIT 1', [row.user_id], (err4, achRows) => {
+                            if (err4) return res.status(500).json({ success: false, message: err4.message });
 
-                        const newLongestStreak = Math.max(longestStreak, newCurrentStreak);
-                        const newTotalPoints = totalPoints + pointsEarned;
-                        const newTotalExp = totalExp + expEarned;
-                        const newTotalTime = totalTime + durationNum;
-                        const newLevel = Math.floor(newTotalExp / 1000) + 1;
+                            let currentStreak = 0, longestStreak = 0, totalPoints = 0, totalExp = 0, totalTime = 0, lastWorkoutDate = null;
+                            if (achRows.length > 0) {
+                                const ach = achRows[0];
+                                currentStreak = ach.current_streak || 0;
+                                longestStreak = ach.longest_streak || 0;
+                                totalPoints = ach.total_points || 0;
+                                totalExp = ach.total_exp || 0;
+                                totalTime = ach.total_time || 0;
+                                lastWorkoutDate = ach.last_workout_date;
+                            }
 
-                        const upsertAchievement = `
-                            INSERT INTO achievements (user_id, current_streak, longest_streak, total_points, total_exp, level, total_time, last_activity_date, last_workout_date)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?)
-                            ON DUPLICATE KEY UPDATE
-                                current_streak = VALUES(current_streak), longest_streak = VALUES(longest_streak),
-                                total_points = VALUES(total_points), total_exp = VALUES(total_exp),
-                                level = VALUES(level), total_time = VALUES(total_time),
-                                last_activity_date = CURDATE(), last_workout_date = VALUES(last_workout_date)
-                        `;
-                        const workoutDateForStreak = reached50Percent ? row.schedule_date : lastWorkoutDate;
+                            let newCurrentStreak = currentStreak;
+                            if (reached50Percent) {
+                                const today = new Date(row.schedule_date); today.setHours(0,0,0,0);
+                                if (lastWorkoutDate) {
+                                    const lastDate = new Date(lastWorkoutDate); lastDate.setHours(0,0,0,0);
+                                    const diffDays = Math.round((today - lastDate) / (1000 * 60 * 60 * 24));
+                                    if (diffDays === 0) newCurrentStreak = currentStreak || 1;
+                                    else if (diffDays === 1) newCurrentStreak = currentStreak + 1;
+                                    else newCurrentStreak = 1;
+                                } else { newCurrentStreak = 1; }
+                            }
 
-                        db.execute(upsertAchievement, [row.user_id, newCurrentStreak, newLongestStreak, newTotalPoints, newTotalExp, newLevel, newTotalTime, workoutDateForStreak], (err5) => {
-                            if (err5) return res.status(500).json({ success: false, message: err5.message });
-                            res.json({ success: true, message: 'Hoàn thành!', calories: finalCalories, exp: expEarned, points: pointsEarned, streak: newCurrentStreak, reached50Percent });
+                            const newLongestStreak = Math.max(longestStreak, newCurrentStreak);
+                            const newTotalPoints = totalPoints + pointsEarned;
+                            const newTotalExp = totalExp + expEarned;
+                            const newTotalTime = totalTime + durationNum;
+                            const newLevel = Math.floor(newTotalExp / 1000) + 1;
+
+                            const upsertAchievement = `
+                                INSERT INTO achievements (user_id, current_streak, longest_streak, total_points, total_exp, level, total_time, last_activity_date, last_workout_date)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?)
+                                ON DUPLICATE KEY UPDATE
+                                    current_streak = VALUES(current_streak), longest_streak = VALUES(longest_streak),
+                                    total_points = VALUES(total_points), total_exp = VALUES(total_exp),
+                                    level = VALUES(level), total_time = VALUES(total_time),
+                                    last_activity_date = CURDATE(), last_workout_date = VALUES(last_workout_date)
+                            `;
+                            const workoutDateForStreak = reached50Percent ? row.schedule_date : lastWorkoutDate;
+
+                            db.execute(upsertAchievement, [row.user_id, newCurrentStreak, newLongestStreak, newTotalPoints, newTotalExp, newLevel, newTotalTime, workoutDateForStreak], (err5) => {
+                                if (err5) return res.status(500).json({ success: false, message: err5.message });
+                                res.json({
+                                    success: true,
+                                    message: 'Hoàn thành!',
+                                    calories: finalCalories,
+                                    exp: expEarned,
+                                    points: pointsEarned,
+                                    streak: newCurrentStreak,
+                                    reached50Percent,
+                                    suggestions: suggestions || []
+                                });
+                            });
                         });
                     });
                 });

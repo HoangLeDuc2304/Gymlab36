@@ -24,7 +24,7 @@ fun SelectModeScreen(
     onSelectMode: (Boolean) -> Unit // true for AI, false for Normal
 ) {
     // Hỗ trợ AI cho cả Lunge và Plank
-    val isAiSupported = exerciseName.lowercase().contains("lunge") || 
+    val isAiSupported = exerciseName.lowercase().contains("lunge") ||
                         exerciseName.lowercase().contains("plank")
 
     Scaffold(
@@ -69,7 +69,7 @@ fun SelectModeScreen(
             ModeButton(
                 title = if (isAiSupported) "CHẾ ĐỘ AI" else "CHẾ ĐỘ AI (SẮP RA MẮT)",
                 description = if (isAiSupported) 
-                    "Sử dụng Camera để AI kiểm tra tư thế và đếm giờ/số lần" 
+                    "Sử dụng Camera để AI kiểm tra tư thế và đếm giờ/số lần"
                     else "Hiện tại chỉ hỗ trợ bài tập Lunges và Plank. Các bài tập khác đang được cập nhật.",
                 color = if (isAiSupported) Color(0xFF00C853) else Color.LightGray,
                 enabled = isAiSupported,
@@ -101,14 +101,14 @@ fun ModeButton(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = title, 
-                fontWeight = FontWeight.Bold, 
+                text = title,
+                fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = if (enabled) Color.White else Color.Gray
             )
             Text(
-                text = description, 
-                fontSize = 12.sp, 
+                text = description,
+                fontSize = 12.sp,
                 textAlign = TextAlign.Center,
                 color = if (enabled) Color.White.copy(alpha = 0.8f) else Color.Gray
             )

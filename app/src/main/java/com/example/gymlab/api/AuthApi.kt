@@ -154,11 +154,19 @@ data class WorkoutResultRequest(
     @SerializedName("effort_feedback") val effortFeedback: Int
 )
 
+data class WorkoutSuggestion(
+    val id: Int,
+    val name: String,
+    val calories: Int,
+    val difficulty: String? = null
+)
+
 data class WorkoutResponse(
     val success: Boolean,
     val message: String,
     val calories: Int? = null,
-    val exp: Int? = null
+    val exp: Int? = null,
+    val suggestions: List<WorkoutSuggestion>? = emptyList()
 )
 
 // ===== Daily schedule =====
