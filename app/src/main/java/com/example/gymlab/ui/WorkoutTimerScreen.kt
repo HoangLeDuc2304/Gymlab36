@@ -125,7 +125,7 @@ fun WorkoutTimerScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(if (isLandscape) 16.dp else 24.dp),
-                    contentAlignment = if (isLandscape) Alignment.Center else Alignment.TopCenter
+                    contentAlignment = Alignment.TopCenter
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Surface(
