@@ -28,6 +28,8 @@ import com.google.mlkit.vision.pose.PoseLandmark
 fun WorkoutCameraScreen(
     modifier: Modifier = Modifier,
     pose: Pose? = null,
+    imageWidth: Int = 0,
+    imageHeight: Int = 0,
     analyzer: ImageAnalysis.Analyzer? = null
 ) {
     if (LocalInspectionMode.current) {
@@ -101,30 +103,39 @@ fun WorkoutCameraScreen(
         )
 
         // Draw Pose Landmarks
-        pose?.let { detectedPose ->
-            PoseOverlay(pose = detectedPose)
+        if (pose != null && imageWidth > 0 && imageHeight > 0) {
+            PoseOverlay(pose = pose, imageWidth = imageWidth, imageHeight = imageHeight)
         }
     }
 }
 
 @Composable
-fun PoseOverlay(pose: Pose) {
+fun PoseOverlay(pose: Pose, imageWidth: Int, imageHeight: Int) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val landmarks = pose.allPoseLandmarks
         if (landmarks.isEmpty()) return@Canvas
 
-        // Lấy kích thước màn hình để scale (Lưu ý: ML Kit tọa độ có thể khác tỉ lệ màn hình)
-        // Đây là cách vẽ đơn giản, thực tế cần tính toán tỉ lệ scale từ ảnh Camera sang View
+        // Tính toán tỉ lệ scale để khớp với màn hình
+        val scaleX = size.width / imageWidth
+        val scaleY = size.height / imageHeight
+
+        // Với Front Camera, ML Kit trả về tọa độ đã lật (mirror) theo mặc định 
+        // nhưng đôi khi logic vẽ cần khớp với PreviewView đã được mirror.
         
+        fun getCanvasOffset(landmark: PoseLandmark): Offset {
+            // ML Kit coordinates are in image space. 
+            // For Front Camera, we need to flip X to match the mirrored preview
+            val flippedX = imageWidth - landmark.position.x
+            return Offset(flippedX * scaleX, landmark.position.y * scaleY)
+        }
+
         // Vẽ các điểm (Landmarks)
         landmarks.forEach { landmark ->
             if (landmark.inFrameLikelihood > 0.5f) {
-                // Tọa độ từ Camera Preview Front thường bị ngược/xoay
-                // Ở đây vẽ tạm để thấy điểm, cần tinh chỉnh scale tùy theo độ phân giải
                 drawCircle(
                     color = Color.Cyan,
                     radius = 8f,
-                    center = Offset(landmark.position.x, landmark.position.y)
+                    center = getCanvasOffset(landmark)
                 )
             }
         }
@@ -136,8 +147,8 @@ fun PoseOverlay(pose: Pose) {
             if (start != null && end != null && start.inFrameLikelihood > 0.5f && end.inFrameLikelihood > 0.5f) {
                 drawLine(
                     color = Color.White,
-                    start = Offset(start.position.x, start.position.y),
-                    end = Offset(end.position.x, end.position.y),
+                    start = getCanvasOffset(start),
+                    end = getCanvasOffset(end),
                     strokeWidth = 4f
                 )
             }

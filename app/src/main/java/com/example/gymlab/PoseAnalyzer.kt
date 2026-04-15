@@ -17,7 +17,7 @@ class PoseAnalyzer(
     private val exerciseName: String,
     private val onPoseDetected: (Boolean) -> Unit,
     private val onRepCounted: (Int) -> Unit,
-    private val onPoseUpdated: (Pose?) -> Unit = {}
+    private val onPoseUpdated: (Pose?, Int, Int) -> Unit = { _, _, _ -> }
 ) : ImageAnalysis.Analyzer {
 
     private val options = AccuratePoseDetectorOptions.Builder()
@@ -31,16 +31,23 @@ class PoseAnalyzer(
     private var repCount = 0
     private var lastPoseState = false
     private var poseStableCounter = 0
-    private val STABILITY_THRESHOLD = 3 // Frames needed to change state
+    private val STABILITY_THRESHOLD = 2 
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
-            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+            val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+            val image = InputImage.fromMediaImage(mediaImage, rotationDegrees)
+            
+            // Lấy kích thước ảnh thực tế sau khi đã tính đến rotation
+            val isRotated = rotationDegrees == 90 || rotationDegrees == 270
+            val width = if (isRotated) imageProxy.height else imageProxy.width
+            val height = if (isRotated) imageProxy.width else imageProxy.height
+
             poseDetector.process(image)
                 .addOnSuccessListener { pose ->
-                    onPoseUpdated(pose)
+                    onPoseUpdated(pose, width, height)
                     
                     val rawIsInPose = when {
                         exerciseName.lowercase().contains("plank") -> checkPlankPose(pose)
@@ -48,7 +55,6 @@ class PoseAnalyzer(
                         else -> false
                     }
                     
-                    // Lọc nhiễu (Stability filter)
                     if (rawIsInPose == lastPoseState) {
                         poseStableCounter++
                     } else {
@@ -60,13 +66,10 @@ class PoseAnalyzer(
                     
                     onPoseDetected(isInPose)
                     
-                    // Logic đếm số lần cho Lunge
                     if (exerciseName.lowercase().contains("lunge")) {
-                        // Trạng thái Down: Khi người dùng hạ thấp người xuống (isInPose = true)
                         if (isInPose && !isLungeDown) {
                             isLungeDown = true
                         } 
-                        // Trạng thái Up: Khi người dùng đứng dậy (isInPose = false)
                         else if (!isInPose && isLungeDown) {
                             isLungeDown = false
                             repCount++
@@ -75,7 +78,7 @@ class PoseAnalyzer(
                     }
                 }
                 .addOnFailureListener {
-                    onPoseUpdated(null)
+                    onPoseUpdated(null, width, height)
                 }
                 .addOnCompleteListener {
                     imageProxy.close()
@@ -89,7 +92,6 @@ class PoseAnalyzer(
         val landmarks = pose.allPoseLandmarks
         if (landmarks.isEmpty()) return false
 
-        // Lấy các điểm chính với độ tin cậy > 0.5
         val leftHip = pose.getPoseLandmark(PoseLandmark.LEFT_HIP)
         val rightHip = pose.getPoseLandmark(PoseLandmark.RIGHT_HIP)
         val leftKnee = pose.getPoseLandmark(PoseLandmark.LEFT_KNEE)
@@ -107,16 +109,9 @@ class PoseAnalyzer(
         val leftKneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle)
         val rightKneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle)
 
-        // Một chân phải gập sâu (Lunge Down phase)
         val isLeftBent = leftKneeAngle in 70.0..120.0
         val isRightBent = rightKneeAngle in 70.0..120.0
 
-        // Kiểm tra độ lệch dọc của đầu gối so với hông (người phải hạ thấp)
-        val leftHipToKneeY = abs(leftHip.position.y - leftKnee.position.y)
-        val rightHipToKneeY = abs(rightHip.position.y - rightKnee.position.y)
-        
-        // Khi đứng thẳng, HipToKneeY sẽ lớn. Khi lunge down, nó sẽ nhỏ đi một chút hoặc gối sau chạm đất.
-        // Quan trọng nhất là khoảng cách giữa 2 bàn chân (ngang)
         val feetDistanceX = abs(leftAnkle.position.x - rightAnkle.position.x)
         val isSteppingWide = feetDistanceX > 150f 
 
@@ -124,32 +119,41 @@ class PoseAnalyzer(
     }
 
     private fun checkPlankPose(pose: Pose): Boolean {
-        val landmarks = pose.allPoseLandmarks
-        if (landmarks.isEmpty()) return false
+        fun getBestLandmark(leftType: Int, rightType: Int): PoseLandmark? {
+            val left = pose.getPoseLandmark(leftType)
+            val right = pose.getPoseLandmark(rightType)
+            return when {
+                left == null -> right
+                right == null -> left
+                left.inFrameLikelihood > right.inFrameLikelihood -> left
+                else -> right
+            }
+        }
 
-        val shoulder = pose.getPoseLandmark(PoseLandmark.LEFT_SHOULDER) ?: pose.getPoseLandmark(PoseLandmark.RIGHT_SHOULDER)
-        val hip = pose.getPoseLandmark(PoseLandmark.LEFT_HIP) ?: pose.getPoseLandmark(PoseLandmark.RIGHT_HIP)
-        val knee = pose.getPoseLandmark(PoseLandmark.LEFT_KNEE) ?: pose.getPoseLandmark(PoseLandmark.RIGHT_KNEE)
-        val ankle = pose.getPoseLandmark(PoseLandmark.LEFT_ANKLE) ?: pose.getPoseLandmark(PoseLandmark.RIGHT_ANKLE)
+        val shoulder = getBestLandmark(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER)
+        val hip = getBestLandmark(PoseLandmark.LEFT_HIP, PoseLandmark.RIGHT_HIP)
+        val knee = getBestLandmark(PoseLandmark.LEFT_KNEE, PoseLandmark.RIGHT_KNEE)
+        val ankle = getBestLandmark(PoseLandmark.LEFT_ANKLE, PoseLandmark.RIGHT_ANKLE)
 
         if (shoulder == null || hip == null || knee == null || ankle == null) return false
-        if (shoulder.inFrameLikelihood < 0.5f || hip.inFrameLikelihood < 0.5f || ankle.inFrameLikelihood < 0.5f) return false
+        
+        val minConfidence = 0.4f
+        if (shoulder.inFrameLikelihood < minConfidence || hip.inFrameLikelihood < minConfidence || ankle.inFrameLikelihood < minConfidence) return false
 
-        // 1. Kiểm tra độ thẳng: Góc hông và góc gối
         val hipAngle = calculateAngle(shoulder, hip, knee)
         val kneeAngle = calculateAngle(hip, knee, ankle)
+        
+        val isStraight = hipAngle > 120.0 && kneeAngle > 120.0
 
-        // Cho phép độ lệch rộng hơn một chút (130 độ thay vì 140-150)
-        val isStraight = hipAngle > 130.0 && kneeAngle > 130.0
-
-        // 2. Kiểm tra hướng nằm: Trong Plank, cơ thể phải trải dài theo chiều ngang
         val dx = abs(shoulder.position.x - ankle.position.x)
         val dy = abs(shoulder.position.y - ankle.position.y)
         
-        // Tỉ lệ X/Y phải lớn (người nằm ngang). Nếu dy > dx thì khả năng cao là đang đứng.
-        val isHorizontal = dx > (dy * 0.5f) // Giảm yêu cầu để dễ nhận diện hơn nếu cam đặt cao
+        val isHorizontal = dx > dy
 
-        return isStraight && isHorizontal
+        val shoulderHipDY = abs(shoulder.position.y - hip.position.y)
+        val isFlat = shoulderHipDY < 250f
+
+        return isStraight && isHorizontal && isFlat
     }
 
     private fun calculateAngle(firstPoint: PoseLandmark, midPoint: PoseLandmark, lastPoint: PoseLandmark): Double {

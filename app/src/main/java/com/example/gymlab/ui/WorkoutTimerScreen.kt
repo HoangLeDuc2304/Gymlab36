@@ -1,8 +1,10 @@
 package com.example.gymlab.ui
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -13,10 +15,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gymlab.PoseAnalyzer
+import com.example.gymlab.R
 import com.example.gymlab.WorkoutCameraScreen
 import com.example.gymlab.ui.theme.PrimaryPurple
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -33,6 +40,23 @@ fun WorkoutTimerScreen(
     mode: String = "normal",
     onFinish: (Int, Int) -> Unit // detailId, duration
 ) {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
+    DisposableEffect(exerciseName) {
+        val activity = context as? Activity
+        if (exerciseName.lowercase().contains("plank")) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+        } else {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
     var seconds by remember { mutableLongStateOf(0L) }
     var isRunning by remember { mutableStateOf(true) }
     
@@ -40,8 +64,10 @@ fun WorkoutTimerScreen(
     var isPoseDetected by remember { mutableStateOf(false) }
     var reps by remember { mutableIntStateOf(0) }
     var currentPose by remember { mutableStateOf<Pose?>(null) }
+    var imageWidth by remember { mutableIntStateOf(0) }
+    var imageHeight by remember { mutableIntStateOf(0) }
 
-    // logic đếm giờ: Nếu là AI mode, chỉ đếm khi isPoseDetected = true
+    // logic đếm giờ
     LaunchedEffect(isRunning, isPoseDetected, mode) {
         while (isRunning) {
             if (mode == "ai") {
@@ -61,6 +87,8 @@ fun WorkoutTimerScreen(
     val minutes = seconds / 60
     val remainingSeconds = seconds % 60
     val timerText = String.format("%02d:%02d", minutes, remainingSeconds)
+    val isLunge = exerciseName.lowercase().contains("lunge")
+    val isPlank = exerciseName.lowercase().contains("plank")
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (mode == "ai") {
@@ -70,75 +98,66 @@ fun WorkoutTimerScreen(
                 WorkoutCameraScreen(
                     modifier = Modifier.fillMaxSize(),
                     pose = currentPose,
+                    imageWidth = imageWidth,
+                    imageHeight = imageHeight,
                     analyzer = remember {
                         PoseAnalyzer(
                             exerciseName = exerciseName,
                             onPoseDetected = { detected -> isPoseDetected = detected },
                             onRepCounted = { count -> reps = count },
-                            onPoseUpdated = { updatedPose -> currentPose = updatedPose }
+                            onPoseUpdated = { updatedPose, width, height -> 
+                                currentPose = updatedPose
+                                imageWidth = width
+                                imageHeight = height
+                            }
                         )
                     }
                 )
                 
-                // Overlay for AI feedback
+                // Overlay AI feedback
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.TopCenter
+                        .padding(if (isLandscape) 16.dp else 24.dp),
+                    contentAlignment = if (isLandscape) Alignment.TopEnd else Alignment.TopCenter
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(
-                            color = if (isPoseDetected) Color.Green.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(
-                                text = if (isPoseDetected) "ĐANG ĐẾM GIỜ..." else "TẠM DỪNG (CHƯA NHẬN DIỆN TƯ THẾ)",
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Bộ đếm Reps - Chỉ hiển thị nếu KHÔNG PHẢI bài Plank
-                        if (!exerciseName.lowercase().contains("plank")) {
-                            Surface(
-                                color = PrimaryPurple.copy(alpha = 0.8f),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("REPS: ", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                                    Text("$reps", color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold)
-                                }
-                            }
-                        }
+                    Surface(
+                        color = if (isPoseDetected) Color.Green.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (isPoseDetected) "ĐANG ĐẾM GIỜ..." else "CHƯA NHẬN DIỆN TƯ THẾ",
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = if (isLandscape) 14.sp else 16.sp
+                        )
                     }
                 }
                 
-                // Ảnh tư thế mẫu ở góc (Placeholder vì không có file ảnh thật)
+                // Tư thế mẫu - Chỉ hiện ảnh, bỏ khung và chữ "MẪU"
                 Box(
                     modifier = Modifier.fillMaxSize().padding(16.dp),
-                    contentAlignment = Alignment.TopEnd
+                    contentAlignment = if (isLandscape) Alignment.TopStart else Alignment.TopEnd
                 ) {
-                    Surface(
-                        modifier = Modifier.size(100.dp, 120.dp),
-                        color = Color.White.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(8.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text("MẪU", color = Color.White, fontSize = 10.sp)
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
-                            Text(if (exerciseName.lowercase().contains("plank")) "Plank" else "Lunges", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
+                    val imageRes = if (isLunge) R.drawable.img_lunge else if (isPlank) R.drawable.img_plank else null
+                    
+                    if (imageRes != null) {
+                        Image(
+                            painter = painterResource(id = imageRes),
+                            contentDescription = "Sample Pose",
+                            modifier = Modifier
+                                .size(if (isLandscape) 100.dp else 120.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.PlayArrow, 
+                            contentDescription = null, 
+                            tint = Color.White.copy(alpha = 0.5f), 
+                            modifier = Modifier.size(if (isLandscape) 30.dp else 40.dp)
+                        )
                     }
                 }
 
@@ -156,40 +175,45 @@ fun WorkoutTimerScreen(
             }
         }
 
+        // Main Controls
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(if (mode == "ai") Color.Transparent else Color.White)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Bottom
+                .padding(if (isLandscape) 16.dp else 24.dp),
+            horizontalAlignment = if (isLandscape) Alignment.End else Alignment.CenterHorizontally,
+            verticalArrangement = if (isLandscape) Arrangement.Center else Arrangement.Bottom
         ) {
             Surface(
                 color = Color.White.copy(alpha = 0.9f),
                 shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+                modifier = if (isLandscape) Modifier.width(280.dp) else Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(if (isLandscape) 16.dp else 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = exerciseName + if (mode == "ai") " (AI MODE)" else "",
-                        fontSize = 20.sp,
+                        fontSize = if (isLandscape) 16.sp else 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp))
 
                     Text(
-                        text = timerText,
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = if (isLunge) "$reps REPS" else timerText,
+                        fontSize = if (isLandscape) 40.sp else 56.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         color = if (mode == "ai" && !isPoseDetected) Color.Gray else PrimaryPurple
                     )
+                    
+                    if (isLunge) {
+                        Text(text = "Thời gian: $timerText", fontSize = 12.sp, color = Color.Gray)
+                    }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(if (isLandscape) 16.dp else 24.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -198,14 +222,14 @@ fun WorkoutTimerScreen(
                     ) {
                         FilledIconButton(
                             onClick = { isRunning = !isRunning },
-                            modifier = Modifier.size(56.dp),
+                            modifier = Modifier.size(if (isLandscape) 48.dp else 56.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = if (isRunning) Color(0xFFF5F5F5) else PrimaryPurple
                             )
                         ) {
                             Icon(
                                 imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isRunning) "Pause" else "Play",
+                                contentDescription = null,
                                 tint = if (isRunning) Color.Black else Color.White
                             )
                         }
@@ -216,13 +240,13 @@ fun WorkoutTimerScreen(
                                 onFinish(detailId, seconds.toInt())
                             },
                             modifier = Modifier
-                                .height(56.dp)
+                                .height(if (isLandscape) 48.dp else 56.dp)
                                 .weight(1f)
-                                .padding(start = 16.dp),
+                                .padding(start = 12.dp),
                             shape = RoundedCornerShape(28.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
                         ) {
-                            Text("HOÀN THÀNH", fontWeight = FontWeight.Bold)
+                            Text("HOÀN THÀNH", fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 12.sp else 14.sp)
                         }
                     }
                 }
