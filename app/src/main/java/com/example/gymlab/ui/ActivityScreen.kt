@@ -38,7 +38,7 @@ import kotlin.math.abs
 
 @Composable
 fun ActivityScreen(
-    userId: Int, // Thêm tham số userId thực tế
+    userId: Int,
     onBackClick: () -> Unit
 ) {
     var newWeightInput by remember { mutableStateOf("") }
@@ -70,7 +70,7 @@ fun ActivityScreen(
         }
     }
 
-    LaunchedEffect(userId) { // Tải lại khi userId thay đổi
+    LaunchedEffect(userId) {
         loadWeightHistory()
     }
 
@@ -165,7 +165,7 @@ fun ActivityScreen(
                                 )
                                 if (response.isSuccessful) {
                                     newWeightInput = ""
-                                    loadWeightHistory() // Cập nhật lại danh sách và ô màu tím
+                                    loadWeightHistory()
                                 }
                             } catch (e: Exception) {
                                 e.printStackTrace()
@@ -184,7 +184,7 @@ fun ActivityScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "Biểu đồ tiến độ",
+            text = "Biểu đồ cân nặng",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Black
@@ -201,8 +201,9 @@ fun ActivityScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             if (historyList.isNotEmpty()) {
-                // Đảo ngược danh sách để vẽ biểu đồ từ cũ đến mới (trái sang phải)
-                WeightChart(historyList.reversed())
+                // Lấy tối đa 10 bản ghi gần nhất và đảo ngược để vẽ từ cũ đến mới
+                val chartData = historyList.take(10).reversed()
+                WeightChart(chartData)
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Chưa có dữ liệu biểu đồ", color = Color.Gray)
@@ -356,23 +357,24 @@ fun WeightChart(data: List<WeightRecordApi>) {
             )
         }
 
+        var lastDrawnDate = ""
+
         points.forEachIndexed { index, offset ->
             drawCircle(PrimaryPurple, radius = 4.dp.toPx(), center = offset)
             drawCircle(Color.White, radius = 2.dp.toPx(), center = offset)
 
-            // Hiển thị nhãn ngày dưới trục X (định dạng MM-DD)
             val fullDate = data[index].recordedDate ?: ""
             if (fullDate.length >= 10) {
                 val dateLabel = fullDate.substring(5, 10).replace("-", "/")
-                
-                // Chỉ hiển thị nhãn nếu không quá dày đặc
-                if (data.size <= 7 || index % (data.size / 5 + 1) == 0 || index == data.size - 1) {
+
+                if (dateLabel != lastDrawnDate) {
                     drawText(
                         textMeasurer = textMeasurer,
                         text = dateLabel,
                         style = textStyle,
                         topLeft = Offset(offset.x - 12.dp.toPx(), chartHeight + 10.dp.toPx())
                     )
+                    lastDrawnDate = dateLabel
                 }
             }
         }
